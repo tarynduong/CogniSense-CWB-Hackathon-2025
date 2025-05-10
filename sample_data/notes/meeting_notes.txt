@@ -1,0 +1,43 @@
+Teams Mtg Notes – Brainstorm: Data Pipeline Optimization
+Date: 25 Apr 2025
+Attendees: Rahul (PM), Priya (DE), Arjun (Architect), Sneha (MLOps), Kiran (Azure SME)
+
+1) Goal
+Improve data pipeline reliability, reduce manual fixes, auto-monitoring, align on best practices.
+
+2) Key discussion points
+Priya:
++. Schema breaks from upstream — no alerts → manual fix every time.
++. Need auto schema val + fallback defaults.
++. Wants reusable transform blocks (modular ETL).
+
+Arjun:
++. Same logic copied across 3+ pipelines → hard to update.
++. Push for shared lib w/ versioning (Git + CI).
++. Lineage unclear — use Purview or similar.
+
+Sneha:
++. No DQ (data quality) checks → silent failures in prod.
++. Discuss pre-prod step.
++. Need alerting on drift/anomalies → prefer Logic Apps over manual logs.
+
+Kiran:
++. ADF good for scale, but static config blocks flexibility.
++. Try param pipelines + trigger-based runs.
++. Suggest connecting ADF to Azure Monitor for metrics/logs.
+
+Rahul:
++. Teams often misaligned on schema versions → propose data contracts per stream.
++. Add KPIs to measure pipeline health (fail %, retries, alert time).
+
+3) Action items
+- Priya to build modular ADF pipeline (1 source → 2 sinks) using reusable dataflows.
+- Arjun to draft versioning plan for ETL logic + schema registry approach (Purview).
+- Sneha do POC Great Expectations in one pipeline → log results.
+- Kiran to enable Azure Monitor for 2 test pipelines + set alerts on failure.
+- Rahul to define initial KPIs for pipeline ops (uptime, error rate, manual touches).
+
+📅 Next Steps
+- Review progress in 2 weeks (demo + bottleneck report)
+- Collect feedback on DQ/alerts
+- Start rollout plan for top 3 priority DPs in May

@@ -1,0 +1,27 @@
+Channel: #project-genai-assistant
+Date: April 28, 2025
+Participants: Rahul (PM), Priya (DE), Arjun (Arch), Sneha (MLOps)
+
+Rahul:
+Good morning everyone, we need to finalize UAT process before next client review. 
+Client expects to see clear acceptance criteria + test scenarios linked to features. 
+Can we demo flashcard & quiz gen?
+
+Priya:
+Yes, but we need mock content ready for that. Should we use internal blogs/docs for UAT?
+
+Arjun:
+Agreed. Let’s define 4–5 workflows: upload → index → query → summarize → generate quiz.
+
+Sneha:
+We can auto-log all user actions during UAT for feedback. I’ll set up basic tracking.
+
+Rahul:
+Perfect. I’ll create UAT checklist + doc for client walk-through. Target: by Wed.
+Also prepare a fallback plan if embedding or AI search gives bad results. Just in case.
+
+Priya:
+Got it. Will include both good and noisy data in the test set.
+
+Arjun:
+Let’s dry run UAT internally on Tuesday.
