@@ -1,5 +1,11 @@
 from bs4 import BeautifulSoup
+import nltk
+from nltk.corpus import stopwords, wordnet
+from nltk.stem import WordNetLemmatizer
 import requests
+import string
+
+nltk.data.path.append("./utils/nltk_data")
 
 def extract_text_from_url(url: str):
     """
@@ -29,3 +35,48 @@ def extract_text_from_url(url: str):
 
     return text
 
+def preprocess_user_query(query):
+    """
+    === Features Summary ===
+    - Remove stop words
+    - Extract keywords
+    - Lemmatize words to get the base form
+    Using WordNetLemmatizer() to reduce words to their base or dictionary form and add these words into the query.
+    For example: the lemma of "running" is "run", "better" => "good".
+    - Synonym expansion (e.g., “meetings” ≈ “sessions”)
+    Using the synsets() function from the WordNet interface in NLTK to get a list of "synsets" (synonym sets) for that word. 
+    A synset is a group of words that have a similar meaning.
+    """
+    ## Step 1: Tokenize & lowercase query
+    query = query.lower()
+    tokens = nltk.word_tokenize(query)
+
+    ## Step 2: Remove stopwords & punctuation 
+    stop_words = set(stopwords.words('english'))
+    tokens = [word for word in tokens if word not in stop_words and word not in string.punctuation]
+    
+    ## Step 3: Lemmatize words to get the base form
+    lemmatizer = WordNetLemmatizer()
+    base_words = [lemmatizer.lemmatize(token, pos='n') for token in tokens if token.isalnum()]
+
+    ## Step 4: Expand synonyms
+    synonyms = set(base_words)
+    for word in base_words:
+        synsets = wordnet.synsets(word)
+        if synsets:
+            # Take the first synonym from the first synset that isn't the word itself
+            for lemma in synsets[0].lemmas():
+                synonym = lemma.name().replace("_", " ").lower()
+                if synonym != word and len(synonym) <= 25:
+                    synonyms.add(synonym)
+                    break  # Only add one synonym
+    
+    combined_list = tokens + base_words + list(synonyms)
+    unique_keywords = []
+    for i in combined_list:
+        if i not in unique_keywords:
+            unique_keywords.append(i)
+    # fuzzy_terms = [f"{word}~" for word in unique_keywords if len(word) >= 3]
+    # expanded_query = " OR ".join(fuzzy_terms)
+    expanded_query = " ".join(unique_keywords)
+    return expanded_query

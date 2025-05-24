@@ -1,50 +1,99 @@
-import os
+from azure.core.credentials import AzureKeyCredential
+from azure.cosmos import CosmosClient, PartitionKey
 from azure.storage.blob import BlobServiceClient
-from azure-cosmos import CosmosClient
+from azure.search.documents import SearchClient
+from azure.search.documents.models import VectorizableTextQuery
 from dotenv import load_dotenv
-from openai import AzureOpenAI
+import uuid
+import datetime
+import os
+import re
 
 load_dotenv(override=True)
 
 # CREDENTIALS
 AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-COSMOS_DB_CONNECTION_STRING = os.getenv("COSMOS_DB_CONNECTION_STRING")
-COSMOS_DB_DATABASE_NAME = os.getenv("COSMOS_DB_DATABASE_NAME")
-COSMOS_DB_CONTAINER_NAME = os.getenv("COSMOS_DB_CONTAINER_NAME")
+AZURE_SEARCH_SERVICE = os.getenv("AZURE_SEARCH_SERVICE")
+AZURE_SEARCH_API_KEY = os.getenv("AZURE_SEARCH_API_KEY")
+AZURE_SEARCH_INDEX = os.getenv("AZURE_SEARCH_INDEX")
+AZURE_SEARCH_API_VERSION = os.getenv("AZURE_SEARCH_API_VERSION")
+AZURE_COSMOS_KEY = os.getenv("AZURE_COSMOS_KEY")
+AZURE_COSMOS_ENDPOINT = os.getenv("AZURE_COSMOS_ENDPOINT")
+COSMOS_DATABASE_NAME = os.getenv("COSMOS_DATABASE_NAME")
+COSMOS_CONTAINER_NAME = os.getenv("COSMOS_CONTAINER_NAME")
 
+# Set up Service
 blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
-cosmos_client = CosmosClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
-database = cosmos_client.get_database_client(COSMOS_DB_DATABASE_NAME)
-container = database.get_container_client(COSMOS_DB_CONTAINER_NAME)
-openai_client = AzureOpenAI(azure_endpoint=OPENAI_ENDPOINT, api_key=OPENAI_KEY, api_version=OPENAI_API_VERSION)
 
-# Add embeddings for properties from request to CosmosDB
-data = request.get_json()
-properties = data.get('properties')
-for property in properties:
-    text = data.get(property)
-    if text:
-        embedding = generate_embeddings(openai_client, text)
-        data[f'{property}_embedding'] = embedding.to_list()
-container.upsert_item(data)
+search_client = SearchClient(
+    endpoint=f"https://{AZURE_SEARCH_SERVICE}.search.windows.net",
+    index_name=AZURE_SEARCH_INDEX,
+    credential=AzureKeyCredential(AZURE_SEARCH_API_KEY)
+)
 
-def generate_embeddings(openai_client, text, dim=256):
-    response = openai_client.embeddings.create(input=text, model='text-3-large', dimensions=dim)
-    embeddings = response.model_dump()
-    return embeddings['data'][0]['embedding']
+cosmos_client = CosmosClient(AZURE_COSMOS_ENDPOINT, AZURE_COSMOS_KEY)
+db = cosmos_client.get_database_client(database=COSMOS_DATABASE_NAME)
+container = db.get_container_client(container=COSMOS_CONTAINER_NAME)
 
 def upload_to_blob(container_name, filename, file_content):
-    container_client = blob_service_client.get_container_client(container_name)
+    container_client = blob_service_client.get_container_client(f"sample-data/{container_name}")
     source_blob_client = container_client.get_blob_client(filename)
     source_blob_client.upload_blob(file_content, overwrite=True)
-    return f"Uploaded to {container_name}/{filename}"
+    return f"Uploaded to sample-data/{container_name}/{filename}"
 
-def get_all_text_blobs():
-    text = ""
-    for container_name in ["blogs", "notes", "documents"]:
-        container = blob_service_client.get_container_client(container_name)
-        blobs = container.list_blobs()
-        for blob in blobs:
-            blob_data = container.download_blob(blob).readall().decode()
-            text += f"\n{blob_data}"
-    return text
+def search_content(query):
+    ## Recognize file extension if mentioned
+    extensions = {
+        ".pdf": ["pdf", "pdfs"],
+        ".docx": ["docx", "word file"],
+        ".txt": ["text", "txt", "text file"]
+    }
+    query = query.lower()
+    file_type = None
+    for key, value in extensions.items():
+        for term in value:
+            if re.search(term, query):
+                file_type = key
+    
+    filter_expr = f"metadata_storage_file_extension eq '{file_type}'" if file_type else None
+
+    # For vector and hybrid search queries purpose
+    vector_query = VectorizableTextQuery(
+        text=query,
+        kind="text",
+        k_nearest_neighbors=10,
+        fields="content_vector"
+    )
+    search_results = search_client.search(
+        search_text=query,
+        query_type="full",
+        search_fields=["metadata_storage_name", "chunk", "content"],
+        search_mode="all",
+        top=2,
+        select="chunk, metadata_storage_name",
+        filter=filter_expr,
+        vector_queries=[vector_query]
+    )
+
+    return file_type, search_results
+
+def store_message(user_id, role, content, topic="default"):
+    item = {
+        "session_id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "role": role,  # "user" or "assistant"
+        "content": content,
+        "timestamp": datetime.datetime.now(),
+        "topic": topic
+    }
+    container.create_item(body=item)
+
+def get_user_chat_history(user_id, topic="default"):
+    query = f"SELECT * FROM c WHERE c.user_id = @user_id AND c.topic = @topic ORDER BY c.timestamp"
+    params = [
+        {"name": "@user_id", "value": user_id},
+        {"name": "@topic", "value": topic}
+    ]
+    items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+    return [(item['role'], item['content']) for item in items]
+    

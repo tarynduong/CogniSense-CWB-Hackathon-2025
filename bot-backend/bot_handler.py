@@ -1,8 +1,7 @@
-
 from flask import Blueprint, jsonify, request
-from utils.azure_utils import upload_to_blob, get_all_text_blobs
-from utils.knowledge_utils import extract_text_from_url
-from utils.gpt_utils import chat_with_docs, generate_flashcards
+from utils.gpt_utils import generate_answer, detect_topic, generate_quiz_from_history, generate_flashcard_from_history
+from utils.azure_utils import upload_to_blob, search_content, store_message, get_user_chat_history
+from utils.knowledge_utils import extract_text_from_url, preprocess_user_query
 
 bot_bp = Blueprint("bot_bp", __name__)
 
@@ -15,9 +14,9 @@ def ingest_url():
     else:
         return jsonify({"error": "No URL provided"}), 400
     
-    upload_to_blob("blogs", filename, text)
+    message = upload_to_blob("blogs", filename, text)
     
-    return jsonify({"message": "Uploaded successfully", "filename": filename}), 201
+    return jsonify({"message": message, "filename": filename}), 200
 
 @bot_bp.route("/ingest_file", methods=["POST"])
 def ingest_file():
@@ -29,25 +28,59 @@ def ingest_file():
     filename = file.filename
     file_content = file.read()
 
-    upload_to_blob(file_type, filename, file_content)
+    message = upload_to_blob(file_type, filename, file_content)
     
-    return jsonify({"message": "Files uploaded", "filename": filename}), 201
+    return jsonify({"message": message, "filename": filename}), 200
 
 @bot_bp.route("/chat", methods=["POST"])
 def chat():
-    user_message = request.json.get("message")
-    all_docs = get_all_text_blobs()  # Load all text from Azure
-    reply = chat_with_docs(user_message, all_docs)
-    return jsonify({"reply": reply})
+    data = request.get_json()
+    user_query = data.get("query")
+    topic = detect_topic(user_query)
+    store_message(user_id, "user", user_query, topic)
+    expanded_query = preprocess_user_query(user_query)
+    try:
+        file_type, search_results = search_content(expanded_query)
+        source = []
+        match_chunk = []
+        for doc in search_results:
+            if "metadata_storage_name" in doc and doc["metadata_storage_name"] not in source:
+                source.append(doc["metadata_storage_name"])
+            if "chunk" in doc and doc["chunk"] not in match_chunk:
+                match_chunk.append(doc["chunk"])
+        
+        fallback_message = (
+            f"I couldn't find any relevant results in **{file_type.upper()}** files, "
+            f"but here are some matches from other file types."
+        ) if file_type is not None else None
+       
+        docs_text = "\n\n".join(match_chunk)
+        source_str = ", ".join(source)
+        answer = f"Source: {source_str}\n\n" + generate_answer(expanded_query, docs_text) 
+        if fallback_message:
+            answer = fallback_message + answer
+        store_message(user_id, "assistant", answer, topic)
 
-@bot_bp.route("/flashcards", methods=["POST"])
-def flashcards():
-    topic = request.json.get("keywords")
-    flashcards = generate_flashcards(topic)
-    return jsonify({"flashcards": flashcards})
+        return jsonify({"topic": topic, "answer": answer})
+    except Exception as e:
+        return jsonify({"error": "Search failed", "details": str(e)}), 500
+    
+@bot_bp.route("/quiz", methods=["POST"])
+def quiz():
+    data = request.get_json()
+    user_id = data.get("user_id", "anonymous")
+    topic = data.get("topic", "GenAI")
 
-@bot_bp.route("/quizzes", methods=["POST"])
-def quizzes():
-    topic = request.json.get("keywords")
-    quizzes = generate_flashcards(topic)
-    return jsonify({"quizzes": quizzes})
+    history = get_user_chat_history(user_id, topic)
+    quiz = generate_quiz_from_history(history)
+    return jsonify({"quiz": quiz})
+
+@bot_bp.route("/flashcard", methods=["POST"])
+def flashcard():
+    data = request.get_json()
+    user_id = data.get("user_id", "anonymous")
+    topic = data.get("topic", "GenAI")
+
+    history = get_user_chat_history(user_id, topic)
+    flashcard = generate_flashcard_from_history(history)
+    return jsonify({"flashcard": flashcard})

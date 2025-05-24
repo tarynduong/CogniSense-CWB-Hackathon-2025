@@ -1,0 +1,13 @@
+1. What were the key decisions from last month's planning meetings
+2. Remind me all the work that I have to do in the daily note
+3. Provide at least three distinct examples about use cases or business challenges that agentic AI is being applied to solve
+4. Summarize the case study pdf file in applying AI solutions in banking 
+5. What is the file genai applied in retail about?
+6. Best practices for improving customer experiences while shopping
+7. How to create the Azure Vector Search
+8. Name one of the five key areas where the article states Gen AI is changing the retail and consumer goods industries.
+9. How is PepsiCo using generative AI in their product development process?
+10. There are some articles about how Bath & Body Works is utilizing generative AI to create high-value customer experiences. I don't remember if they are pdf or txt file, can you search and extract?
+11. Tell me about the partnership between Cognizant and Microsoft?
+12. Beyond internal use, what is Cognizant's commitment regarding the deployment of Microsoft 365 Copilot for their clients? What is the scope of this commitment in terms of user numbers and industries?
+13. Any documents about data security?
