@@ -4,8 +4,17 @@ from nltk.corpus import stopwords, wordnet
 from nltk.stem import WordNetLemmatizer
 import requests
 import string
+import jwt
+from datetime import datetime as dt
+import os 
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 nltk.data.path.append("./utils/nltk_data")
+
 
 def extract_text_from_url(url: str):
     """
@@ -35,9 +44,28 @@ def extract_text_from_url(url: str):
 
     return text
 
+
+def tokenize_id(id):
+    token = jwt.encode(
+        {"user_id": id, "exp": int(dt.now().timestamp()) + 86400}, 
+        SECRET_KEY,
+        algorithm="HS256"
+    )
+    return token
+
+
+def encode_token(token):
+    payload = jwt.decode(token, SECRET_KEY, algorithms = ["HS256"])
+    exp = payload["exp"]
+    if exp < dt.now().timestamp():
+        return "Unauthorized", 401
+    else:
+        return payload, 200
+
+
 def preprocess_user_query(query):
     """
-    === Features Summary ===
+    === Summary ===
     - Remove stop words
     - Extract keywords
     - Lemmatize words to get the base form
@@ -76,7 +104,5 @@ def preprocess_user_query(query):
     for i in combined_list:
         if i not in unique_keywords:
             unique_keywords.append(i)
-    # fuzzy_terms = [f"{word}~" for word in unique_keywords if len(word) >= 3]
-    # expanded_query = " OR ".join(fuzzy_terms)
     expanded_query = " ".join(unique_keywords)
     return expanded_query

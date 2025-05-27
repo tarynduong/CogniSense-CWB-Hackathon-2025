@@ -1,9 +1,11 @@
 from flask import Blueprint, jsonify, request
 from utils.gpt_utils import generate_answer, detect_topic, generate_quiz_from_history, generate_flashcard_from_history
-from utils.azure_utils import upload_to_blob, search_content, store_message, get_user_chat_history
-from utils.knowledge_utils import extract_text_from_url, preprocess_user_query
+from utils.azure_utils import add_user, check_user, upload_to_blob, search_content, store_message, get_user_chat_history
+from utils.knowledge_utils import encode_token, extract_text_from_url, preprocess_user_query, tokenize_id
+
 
 bot_bp = Blueprint("bot_bp", __name__)
+
 
 @bot_bp.route("/ingest_url", methods=["POST"])
 def ingest_url():
@@ -17,6 +19,7 @@ def ingest_url():
     message = upload_to_blob("blogs", filename, text)
     
     return jsonify({"message": message, "filename": filename}), 200
+
 
 @bot_bp.route("/ingest_file", methods=["POST"])
 def ingest_file():
@@ -32,9 +35,39 @@ def ingest_file():
     
     return jsonify({"message": message, "filename": filename}), 200
 
+
+@bot_bp.route("/register", methods=["POST"])
+def register():
+    data = request.get_json() 
+    username = data["username"]
+    password = data["password"]
+    message, user_id = add_user(username, password)
+    token = tokenize_id(user_id)
+
+    return jsonify({"message": message, "access_token": token}), 200
+
+
+@bot_bp.route("/login", methods=["POST"])
+def login():
+    data = request.get_json() 
+    username = data["username"]
+    password = data["password"]
+    message, user_id = check_user(username, password)
+    token = tokenize_id(user_id)
+    
+    return jsonify({"message": message, "access_token": token}), 200
+
+
 @bot_bp.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
+    header = request.headers.get("Authorization")
+    token = header[7:] if header else None # remove Bearer
+    result, status_code = encode_token(token)
+    if status_code != 200:
+        return jsonify({"message": result}), status_code
+    
+    user_id = result['user_id']
     user_query = data.get("query")
     topic = detect_topic(user_query)
     store_message(user_id, "user", user_query, topic)
@@ -65,22 +98,37 @@ def chat():
     except Exception as e:
         return jsonify({"error": "Search failed", "details": str(e)}), 500
     
+
 @bot_bp.route("/quiz", methods=["POST"])
 def quiz():
     data = request.get_json()
-    user_id = data.get("user_id", "anonymous")
-    topic = data.get("topic", "GenAI")
-
+    header = request.headers.get("Authorization")
+    token = header[7:] if header else None # remove Bearer
+    result, status_code = encode_token(token)
+    if status_code != 200:
+        return jsonify({"message": result}), status_code
+    
+    user_id = result['user_id']
+    topic = data.get("topic")
     history = get_user_chat_history(user_id, topic)
-    quiz = generate_quiz_from_history(history)
+    quiz = generate_quiz_from_history(history, topic, user_id)
+
     return jsonify({"quiz": quiz})
+
 
 @bot_bp.route("/flashcard", methods=["POST"])
 def flashcard():
     data = request.get_json()
-    user_id = data.get("user_id", "anonymous")
-    topic = data.get("topic", "GenAI")
+    header = request.headers.get("Authorization")
+    token = header[7:] if header else None # remove Bearer
+    result, status_code = encode_token(token)
+    if status_code != 200:
+        return jsonify({"message": result}), status_code
+    
+    user_id = result['user_id']
+    topic = data.get("topic")
 
     history = get_user_chat_history(user_id, topic)
-    flashcard = generate_flashcard_from_history(history)
+    flashcard = generate_flashcard_from_history(history, topic, user_id)
+    
     return jsonify({"flashcard": flashcard})
