@@ -1,3 +1,4 @@
+from nltk.classify.textcat import re
 from openai import AzureOpenAI
 import os
 from dotenv import load_dotenv
@@ -224,4 +225,3 @@ def generate_flashcard_from_history(history, topic, user_id):
         raise ValueError("Refusal to generate flashcards: " + message.refusal)
 
     return resp_message, message.parsed.model_dump() if message.parsed else dict()
-
