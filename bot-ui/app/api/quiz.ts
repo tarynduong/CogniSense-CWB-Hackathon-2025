@@ -1,6 +1,7 @@
 import { FLASHCARD_ENDPOINT, QUIZ_ENDPOINT } from "@/api/constants";
 import { getAccessToken } from "@/features/auth/auth";
 import type { Flashcard, Quiz } from "@/features/quiz/types";
+import { shuffle } from "@/lib/utils";
 import axios, { AxiosError } from "axios";
 
 export async function getQuestions(topic: string | undefined): Promise<{
@@ -83,10 +84,12 @@ export async function getQuizzes(topic: string | undefined): Promise<{
       return {
         quizzes: (data || []).map((quiz) => ({
           question: quiz.question,
-          answers: quiz.answers.map((answer) => ({
-            answer: answer.answer,
-            isCorrectAnswer: answer.is_correct_answer,
-          })),
+          answers: shuffle(
+            quiz.answers.map((answer) => ({
+              answer: answer.answer,
+              isCorrectAnswer: answer.is_correct_answer,
+            }))
+          ),
         })),
         message: message,
       };

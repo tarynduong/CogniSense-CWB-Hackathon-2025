@@ -55,7 +55,7 @@ export function AppSidebar() {
   const { setOpenMobile } = useSidebar();
   const [open, setOpen] = useState(false);
   const [isUploading, setUploading] = useState(false);
-  const [fileType, setFileType] = useState("blog");
+  const [fileType, setFileType] = useState("notes");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const blogUrlRef = useRef<HTMLInputElement>(null);
 
@@ -146,15 +146,16 @@ export function AppSidebar() {
             <div className="grid w-full max-w-sm items-center gap-2">
               <Label htmlFor="doc-type">Type</Label>
               <Select value={fileType} onValueChange={setFileType}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger>
                   <SelectValue placeholder="Select file type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="blog" defaultChecked>
-                    Blog
+                  <SelectItem value="notes">
+                    Notes: personal notes, chat discussion
                   </SelectItem>
-                  <SelectItem value="text">Text</SelectItem>
-                  <SelectItem value="docs">Docs</SelectItem>
+                  <SelectItem value="documents">
+                    Docs: any text files in 3 formats txt pdf docx
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

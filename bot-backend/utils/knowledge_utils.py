@@ -6,7 +6,7 @@ import requests
 import string
 import jwt
 from datetime import datetime as dt
-import os 
+import os
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -45,16 +45,16 @@ def extract_text_from_url(url: str):
     return text
 
 
-def tokenize_id(id):
+def encode_token(id):
     token = jwt.encode(
-        {"user_id": id, "exp": int(dt.now().timestamp()) + 86400}, 
+        {"user_id": id, "exp": int(dt.now().timestamp()) + 86400},
         SECRET_KEY,
         algorithm="HS256"
     )
     return token
 
 
-def encode_token(token):
+def decode_token(token):
     payload = jwt.decode(token, SECRET_KEY, algorithms = ["HS256"])
     exp = payload["exp"]
     if exp < dt.now().timestamp():
@@ -72,17 +72,17 @@ def preprocess_user_query(query):
     Using WordNetLemmatizer() to reduce words to their base or dictionary form and add these words into the query.
     For example: the lemma of "running" is "run", "better" => "good".
     - Synonym expansion (e.g., “meetings” ≈ “sessions”)
-    Using the synsets() function from the WordNet interface in NLTK to get a list of "synsets" (synonym sets) for that word. 
+    Using the synsets() function from the WordNet interface in NLTK to get a list of "synsets" (synonym sets) for that word.
     A synset is a group of words that have a similar meaning.
     """
     ## Step 1: Tokenize & lowercase query
     query = query.lower()
     tokens = nltk.word_tokenize(query)
 
-    ## Step 2: Remove stopwords & punctuation 
+    ## Step 2: Remove stopwords & punctuation
     stop_words = set(stopwords.words('english'))
     tokens = [word for word in tokens if word not in stop_words and word not in string.punctuation]
-    
+
     ## Step 3: Lemmatize words to get the base form
     lemmatizer = WordNetLemmatizer()
     base_words = [lemmatizer.lemmatize(token, pos='n') for token in tokens if token.isalnum()]
@@ -98,7 +98,7 @@ def preprocess_user_query(query):
                 if synonym != word and len(synonym) <= 25:
                     synonyms.add(synonym)
                     break  # Only add one synonym
-    
+
     combined_list = tokens + base_words + list(synonyms)
     unique_keywords = []
     for i in combined_list:

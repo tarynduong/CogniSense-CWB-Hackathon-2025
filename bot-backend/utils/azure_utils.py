@@ -5,7 +5,7 @@ from azure.search.documents import SearchClient
 from azure.search.documents.models import VectorizableTextQuery
 from dotenv import load_dotenv
 import uuid
-from datetime import datetime as dt 
+from datetime import datetime as dt
 import os
 import re
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -54,7 +54,7 @@ def add_user(username, password):
     existing_users = [item for item in result]
     if existing_users:
         return "Username already exists", existing_users[0]["id"]
-    
+
     user_item = {
         "id": str(uuid.uuid4()),
         "UserName": username,
@@ -72,7 +72,7 @@ def check_user(username, password):
         )
     users = [item for item in result]
     if not users or not check_password_hash(users[0]["Password"], password):
-        return "Invalid credentials", users[0]["id"]
+        return "Invalid credentials", None
     else:
         return "Login successful", users[0]["id"]
 
@@ -89,7 +89,7 @@ def search_content(query):
         for term in value:
             if re.search(term, query):
                 file_type = key
-    
+
     filter_expr = f"metadata_storage_file_extension eq '{file_type}'" if file_type else None
 
     # For vector and hybrid search queries purpose
@@ -131,10 +131,12 @@ def get_user_chat_history(user_id, topic):
     params=[{"name": "@user_id", "value": user_id}]
     items = list(chat_container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
     return [(item['Role'], item['Content']) for item in items]
-    
+
 
 def get_past_topic(user_id):
     query = f"SELECT c.Topic FROM Messages c WHERE c.UserId = @user_id ORDER BY c.Timestamp"
     params = [{"name": "@user_id", "value": user_id}]
     items = list(chat_container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
-    return [item['Topic'] for item in items]
+    topics = [item['Topic'].replace("topic:", "").strip() for item in items]
+    topics = list(dict.fromkeys(topics))
+    return topics

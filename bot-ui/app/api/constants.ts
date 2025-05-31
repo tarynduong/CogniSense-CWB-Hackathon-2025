@@ -1,5 +1,5 @@
 const API_ENDPOINT =
-  import.meta.env.AZURE_CHAT_OPENAI_API_KEY || "http://127.0.0.1:5000/bot";
+  import.meta.env.VITE_API_ENDPOINT || "http://127.0.0.1:5000/bot";
 
 export const LOGIN_ENDPOINT = `${API_ENDPOINT}/login`;
 export const REGISTER_ENDPOINT = `${API_ENDPOINT}/register`;
