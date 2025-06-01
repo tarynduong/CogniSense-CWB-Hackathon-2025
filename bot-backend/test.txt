@@ -11,5 +11,3 @@
 11. Tell me about the partnership between Cognizant and Microsoft?
 12. Beyond internal use, what is Cognizant's commitment regarding the deployment of Microsoft 365 Copilot for their clients? What is the scope of this commitment in terms of user numbers and industries?
 13. Any documents about data security?
-
-chọn 2, 5, 6, 7, 11
