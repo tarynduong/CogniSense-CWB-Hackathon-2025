@@ -1,0 +1,23 @@
+{
+  "@odata.context": "https://cognisense-vector-search.search.windows.net/$metadata#datasources/$entity",
+  "@odata.etag": "\"0x8DD9A39650B7F14\"",
+  "name": "cognisense-kb",
+  "description": null,
+  "type": "azureblob",
+  "subtype": null,
+  "indexerPermissionOptions": [],
+  "credentials": {
+    "connectionString": "DefaultEndpointsProtocol=https;AccountName=cognisensekbsa;AccountKey=..."
+  },
+  "container": {
+    "name": "sample-data",
+    "query": null
+  },
+  "dataChangeDetectionPolicy": {
+    "@odata.type": "#Microsoft.Azure.Search.HighWaterMarkChangeDetectionPolicy",
+    "highWaterMarkColumnName": "metadata_storage_last_modified"
+  },
+  "dataDeletionDetectionPolicy": null,
+  "encryptionKey": null,
+  "identity": null
+}
