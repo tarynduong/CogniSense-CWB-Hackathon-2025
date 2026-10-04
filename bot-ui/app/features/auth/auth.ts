@@ -7,7 +7,7 @@ type JwtPayload = {
 
 export const getAccessToken = () => {
   const accessToken = localStorage.getItem("accessToken");
-  if (!isValidAccessToken) {
+  if (!accessToken || !isValidAccessToken(accessToken)) {
     removeAccessToken();
     return null;
   }
@@ -23,14 +23,18 @@ export const removeAccessToken = () => {
 };
 
 export const isValidAccessToken = (accessToken: string) => {
-  const decodedToken = jwtDecode<JwtPayload>(accessToken);
-  if (!decodedToken.exp || decodedToken.exp < Date.now() / 1000) {
+  try {
+    const decodedToken = jwtDecode<JwtPayload>(accessToken);
+    if (!decodedToken.exp || decodedToken.exp < Date.now() / 1000) {
+      return false;
+    }
+
+    if (!decodedToken.user_id) {
+      return false;
+    }
+
+    return true;
+  } catch {
     return false;
   }
-
-  if (!decodedToken.user_id) {
-    return false;
-  }
-
-  return true;
 };

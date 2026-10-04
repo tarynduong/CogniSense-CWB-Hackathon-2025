@@ -32,7 +32,9 @@ export async function login(
     .catch((error: AxiosError) => {
       return {
         error:
-          ((error.response?.data as any).message as string) || error.message,
+          (error.response?.data as any)?.message ||
+          error.message ||
+          "Unable to reach the server. Please try again.",
         accessToken: undefined,
       };
     });
@@ -66,10 +68,12 @@ export async function signup(
         accessToken: access_token,
       };
     })
-    .catch((error) => {
+    .catch((error: AxiosError) => {
       return {
         error:
-          ((error.response?.data as any).message as string) || error.message,
+          (error.response?.data as any)?.message ||
+          error.message ||
+          "Unable to reach the server. Please try again.",
         accessToken: undefined,
       };
     });
