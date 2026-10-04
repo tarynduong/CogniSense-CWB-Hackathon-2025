@@ -32,12 +32,18 @@ export async function chatWithBot(query: string): Promise<{
       };
     })
     .catch((error: AxiosError) => {
+      const data = error.response?.data as
+        | { error?: string; details?: string; message?: string }
+        | undefined;
       return {
         topic: undefined,
         answer: undefined,
         error:
-          (error.response?.data as { error: string; details: string })
-            .details || error.message,
+          data?.details ||
+          data?.message ||
+          data?.error ||
+          error.message ||
+          "Unable to reach the server. Please try again.",
       };
     });
 }

@@ -118,7 +118,7 @@ def detect_topic(user_message: str) -> str:
     response = openai_chat_client.chat.completions.create(
         model=AZURE_CHAT_MODEL,
         temperature=0,
-        max_tokens=10,
+        max_completion_tokens=10,
         messages=[
             {"role": "system", "content": topic_system_prompt},
             {"role": "user", "content": user_message}
@@ -182,18 +182,6 @@ class Flashcards(BaseModel):
     explain: str
 
 def generate_flashcard_from_history(history, topic, user_id):
-    # if topic == "":
-    #     messages = [
-    #         {"role": "system", "content": "You tell user that topic is not given so default topic which is Gen AI is used instead to generate flashcards"},
-    #         {"role": "user", "content": "Create 5 flashcards to help me review this material."}
-    #     ]
-    # past_topics = ', '.join(get_past_topic(user_id))
-    # if len(history) == 0:
-    #     messages = [
-    #         {"role": "system", "content": f"You are CogniSense, a personal assistant. Tell user that the topic they are looking for has not been discussed with you yet. List of topics user consumed in the past includes {past_topics}. Request them to choose either one of these topics and stop just that. Don't create anything user wants."},
-    #         {"role": "user", "content": "Create 5 flashcards to help me review this material."}
-    #     ]
-
     resp_message = ""
     if topic == "":
         resp_message += "Since no topic was specified, we will use the default topic 'GenAI' to generate flashcards.\n"

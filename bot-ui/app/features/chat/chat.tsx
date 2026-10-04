@@ -68,18 +68,34 @@ export function Chat() {
     setMessages((prev) => [...prev, message]);
     setCurrentMessage("");
 
-    // API Call here
-    const { answer } = await chatWithBot(message.text);
-    if (answer) {
+    try {
+      // API Call here
+      const { answer, error } = await chatWithBot(message.text);
+      const text =
+        answer ||
+        (error
+          ? `Sorry, something went wrong: ${error}`
+          : "Sorry, I couldn't generate a response. Please try again.");
       setMessages((prev) => [
         ...prev,
         {
-          text: answer,
+          text,
           role: "assistant",
         },
       ]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: `Sorry, something went wrong: ${
+            err instanceof Error ? err.message : "unknown error"
+          }`,
+          role: "assistant",
+        },
+      ]);
+    } finally {
+      setFetching(false);
     }
-    setFetching(false);
   };
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
