@@ -1,4 +1,5 @@
 .DS_Store
+.azure
 /node_modules/
 
 # React Router
