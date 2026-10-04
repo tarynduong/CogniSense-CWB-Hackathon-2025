@@ -1,0 +1,40 @@
+{
+  "@odata.context": "https://cognisense-vector-search.search.windows.net/$metadata#indexers/$entity",
+  "@odata.etag": "\"0x8DDA05299F62769\"",
+  "name": "cognisense-indexer",
+  "description": null,
+  "dataSourceName": "cognisense-kb",
+  "skillsetName": "cognisense-skillset",
+  "targetIndexName": "cognisense-index",
+  "disabled": null,
+  "schedule": null,
+  "parameters": {
+    "batchSize": null,
+    "maxFailedItems": 0,
+    "maxFailedItemsPerBatch": 0,
+    "configuration": {
+      "dataToExtract": "contentAndMetadata",
+      "parsingMode": "default",
+      "allowSkillsetToReadFileData": true
+    }
+  },
+  "fieldMappings": [
+    {
+      "sourceFieldName": "metadata_storage_path",
+      "targetFieldName": "id",
+      "mappingFunction": {
+        "name": "base64Encode",
+        "parameters": null
+      }
+    }
+  ],
+  "outputFieldMappings": [
+    {
+      "sourceFieldName": "/document/pages/*/keyphrases/*",
+      "targetFieldName": "keyphrases",
+      "mappingFunction": null
+    }
+  ],
+  "cache": null,
+  "encryptionKey": null
+}

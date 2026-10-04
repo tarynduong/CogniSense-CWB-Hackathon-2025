@@ -28,7 +28,6 @@ CogniSense is an intelligent, conversational AI assistant that helps users manag
 bot-backend/
 ├── utils/
 │   ├── azure_utils.py     # Azure services integration
-│   ├── data_utils.py      # Data structures and utilities
 │   ├── gpt_utils.py       # OpenAI API integration
 │   ├── knowledge_utils.py # NLP and token handling
 │   └── nltk_data/         # NLTK data directory

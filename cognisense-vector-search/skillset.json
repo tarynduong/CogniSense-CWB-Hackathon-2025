@@ -1,0 +1,148 @@
+{
+  "@odata.etag": "\"0x8DD9A39651198B6\"",
+  "name": "cognisense-skillset",
+  "description": "Skillset created from the portal. skillsetName: cognisense-skillset; contentField: content; enrichmentGranularity: pages; knowledgeStoreStorageAccount: ;",
+  "skills": [
+    {
+      "@odata.type": "#Microsoft.Skills.Text.SplitSkill",
+      "name": "Text.SplitSkill",
+      "context": "/document",
+      "defaultLanguageCode": "en",
+      "textSplitMode": "pages",
+      "maximumPageLength": 5000,
+      "pageOverlapLength": 100,
+      "maximumPagesToTake": 0,
+      "unit": "characters",
+      "inputs": [
+        {
+          "name": "text",
+          "source": "/document/content",
+          "inputs": []
+        }
+      ],
+      "outputs": [
+        {
+          "name": "textItems",
+          "targetName": "pages"
+        }
+      ]
+    },
+    {
+      "@odata.type": "#Microsoft.Skills.Text.AzureOpenAIEmbeddingSkill",
+      "name": "Text.Embedding",
+      "context": "/document/pages/*",
+      "resourceUri": "https://cognisense-model.openai.azure.com",
+      "apiKey": "<redacted>",
+      "deploymentId": "text-embedding-3-small",
+      "dimensions": 1536,
+      "modelName": "text-embedding-3-small",
+      "inputs": [
+        {
+          "name": "text",
+          "source": "/document/pages/*",
+          "inputs": []
+        }
+      ],
+      "outputs": [
+        {
+          "name": "embedding",
+          "targetName": "content_vector"
+        }
+      ]
+    },
+    {
+      "@odata.type": "#Microsoft.Skills.Text.KeyPhraseExtractionSkill",
+      "name": "Text.KeyPhraseExtraction",
+      "context": "/document/pages/*",
+      "defaultLanguageCode": "en",
+      "maxKeyPhraseCount": 10,
+      "inputs": [
+        {
+          "name": "text",
+          "source": "/document/pages/*",
+          "inputs": []
+        }
+      ],
+      "outputs": [
+        {
+          "name": "keyPhrases",
+          "targetName": "keyphrases"
+        }
+      ]
+    }
+  ],
+  "indexProjections": {
+    "selectors": [
+      {
+        "targetIndexName": "cognisense-index",
+        "parentKeyFieldName": "id",
+        "sourceContext": "/document/pages/*",
+        "mappings": [
+          {
+            "name": "content_vector",
+            "source": "/document/pages/*/content_vector",
+            "inputs": []
+          },
+          {
+            "name": "keyphrases",
+            "source": "/document/pages/*/keyphrases",
+            "inputs": []
+          },
+          {
+            "name": "chunk",
+            "source": "/document/pages/*",
+            "inputs": []
+          },
+          {
+            "name": "content",
+            "source": "/document/content",
+            "inputs": []
+          },
+          {
+            "name": "metadata_storage_content_type",
+            "source": "/document/metadata_storage_content_type",
+            "inputs": []
+          },
+          {
+            "name": "metadata_storage_size",
+            "source": "/document/metadata_storage_size",
+            "inputs": []
+          },
+          {
+            "name": "metadata_storage_last_modified",
+            "source": "/document/metadata_storage_last_modified",
+            "inputs": []
+          },
+          {
+            "name": "metadata_storage_content_md5",
+            "source": "/document/metadata_storage_content_md5",
+            "inputs": []
+          },
+          {
+            "name": "metadata_storage_name",
+            "source": "/document/metadata_storage_name",
+            "inputs": []
+          },
+          {
+            "name": "metadata_storage_path",
+            "source": "/document/metadata_storage_path",
+            "inputs": []
+          },
+          {
+            "name": "metadata_storage_file_extension",
+            "source": "/document/metadata_storage_file_extension",
+            "inputs": []
+          },
+          {
+            "name": "metadata_content_type",
+            "source": "/document/metadata_content_type",
+            "inputs": []
+          }
+        ]
+      }
+    ],
+    "parameters": {
+      "projectionMode": "skipIndexingParentDocuments"
+    }
+  }
+}
