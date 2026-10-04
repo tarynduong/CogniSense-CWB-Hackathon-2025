@@ -12,7 +12,7 @@ def ingest_url():
     if "url" in request.form:
         url = request.form["url"]
         text = extract_text_from_url(url)
-        filename = url.replace("https://", "").split("/")[-1].replace("-", "_") + ".txt"
+        filename = url.replace("https://", "").split("/")[-2] + ".txt" if url.replace("https://", "").split("/")[-1] == "" else url.replace("https://", "").split("/")[-1] + ".txt"
     else:
         return jsonify({"error": "No URL provided"}), 400
 

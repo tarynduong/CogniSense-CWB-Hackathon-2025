@@ -8,22 +8,22 @@ from .azure_utils import get_past_topic
 load_dotenv()
 
 AZURE_EMBEDDING_OPENAI_API_KEY = os.getenv("AZURE_EMBEDDING_OPENAI_API_KEY")
-AZURE_OPENAI_SERVICE = os.getenv("AZURE_OPENAI_SERVICE")
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
 AZURE_EMBEDDING_MODEL = os.getenv("AZURE_EMBEDDING_MODEL")
 AZURE_CHAT_MODEL = os.getenv("AZURE_CHAT_MODEL") or ""
 AZURE_CHAT_OPENAI_API_KEY = os.getenv("AZURE_CHAT_OPENAI_API_KEY")
-AZURE_CHAT_ENDPOINT = os.getenv("AZURE_CHAT_ENDPOINT")
+# AZURE_CHAT_ENDPOINT = os.getenv("AZURE_CHAT_ENDPOINT")
 
 openai_embedding_client = AzureOpenAI(
     api_version=AZURE_OPENAI_API_VERSION,
-    azure_endpoint=AZURE_OPENAI_SERVICE,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_key=AZURE_EMBEDDING_OPENAI_API_KEY
 )
 
 openai_chat_client = AzureOpenAI(
     api_version=AZURE_OPENAI_API_VERSION,
-    azure_endpoint=AZURE_CHAT_ENDPOINT,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_key=AZURE_CHAT_OPENAI_API_KEY
 )
 

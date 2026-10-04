@@ -48,6 +48,7 @@ bot-backend/
   - Azure Cosmos DB
   - Azure Blob Storage
   - Azure Cognitive Search
+  - Azure App Service
 
 ### Installation Steps
 
@@ -77,7 +78,7 @@ bot-backend/
    ```
    # Azure OpenAI Configuration
    AZURE_OPENAI_API_VERSION=<your-api-version>
-   AZURE_OPENAI_SERVICE=<your-service-endpoint>
+   AZURE_OPENAI_ENDPOINT=<your-service-endpoint>
    AZURE_EMBEDDING_OPENAI_API_KEY=<your-embedding-api-key>
    AZURE_EMBEDDING_MODEL=<your-embedding-model>
    AZURE_CHAT_MODEL=<your-chat-model>

@@ -73,37 +73,7 @@ bot-backend/
    python nltk_download.py
    ```
 
-5. Create a `.env` file with the following variables:
-   ```
-   # Azure OpenAI Configuration
-   AZURE_OPENAI_API_VERSION=<your-api-version>
-   AZURE_OPENAI_SERVICE=<your-service-endpoint>
-   AZURE_EMBEDDING_OPENAI_API_KEY=<your-embedding-api-key>
-   AZURE_EMBEDDING_MODEL=<your-embedding-model>
-   AZURE_CHAT_MODEL=<your-chat-model>
-   AZURE_CHAT_OPENAI_API_KEY=<your-chat-api-key>
-   AZURE_CHAT_ENDPOINT=<your-chat-endpoint>
-
-   # Azure Storage
-   AZURE_STORAGE_CONNECTION_STRING=<your-storage-connection-string>
-
-   # Azure Search
-   AZURE_SEARCH_SERVICE=<your-search-service>
-   AZURE_SEARCH_API_KEY=<your-search-api-key>
-   AZURE_SEARCH_INDEX=<your-search-index>
-   AZURE_SEARCH_API_VERSION=<your-search-api-version>
-
-   # Azure Cosmos DB
-   AZURE_COSMOS_ENDPOINT=<your-cosmos-endpoint>
-   AZURE_COSMOS_KEY=<your-cosmos-key>
-   COSMOS_DATABASE_NAME=<your-database-name>
-   COSMOS_CONTAINER_NAME=<your-container-name>
-
-   # Authentication
-   SECRET_KEY=<your-jwt-secret-key>
-   ```
-
-6. Run the application:
+5. Run the application:
    ```
    python web_app.py
    ```
