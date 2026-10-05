@@ -15,7 +15,8 @@
     "configuration": {
       "dataToExtract": "contentAndMetadata",
       "parsingMode": "default",
-      "allowSkillsetToReadFileData": true
+      "allowSkillsetToReadFileData": true,
+      "imageAction": "generateNormalizedImages"
     }
   },
   "fieldMappings": [

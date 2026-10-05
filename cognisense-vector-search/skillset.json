@@ -1,22 +1,75 @@
 {
-  "@odata.etag": "\"0x8DD9A39651198B6\"",
+  "@odata.etag": "\"0x8DF2235C5912D84\"",
   "name": "cognisense-skillset",
   "description": "Skillset created from the portal. skillsetName: cognisense-skillset; contentField: content; enrichmentGranularity: pages; knowledgeStoreStorageAccount: ;",
   "skills": [
+    {
+      "@odata.type": "#Microsoft.Skills.Vision.OcrSkill",
+      "name": "Vision.Ocr",
+      "description": "Extracts text from image-based (scanned) pages so content is never empty.",
+      "context": "/document/normalized_images/*",
+      "lineEnding": "Space",
+      "defaultLanguageCode": "en",
+      "detectOrientation": true,
+      "inputs": [
+        {
+          "name": "image",
+          "source": "/document/normalized_images/*",
+          "inputs": []
+        }
+      ],
+      "outputs": [
+        {
+          "name": "text",
+          "targetName": "ocr_text"
+        }
+      ]
+    },
+    {
+      "@odata.type": "#Microsoft.Skills.Text.MergeSkill",
+      "name": "Text.MergeOcr",
+      "description": "Merges the native text layer with OCR text from images into a single field.",
+      "context": "/document",
+      "insertPreTag": " ",
+      "insertPostTag": " ",
+      "inputs": [
+        {
+          "name": "text",
+          "source": "/document/content",
+          "inputs": []
+        },
+        {
+          "name": "itemsToInsert",
+          "source": "/document/normalized_images/*/ocr_text",
+          "inputs": []
+        },
+        {
+          "name": "offsets",
+          "source": "/document/normalized_images/*/contentOffset",
+          "inputs": []
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mergedText",
+          "targetName": "merged_content"
+        }
+      ]
+    },
     {
       "@odata.type": "#Microsoft.Skills.Text.SplitSkill",
       "name": "Text.SplitSkill",
       "context": "/document",
       "defaultLanguageCode": "en",
       "textSplitMode": "pages",
-      "maximumPageLength": 5000,
+      "maximumPageLength": 2000,
       "pageOverlapLength": 100,
       "maximumPagesToTake": 0,
       "unit": "characters",
       "inputs": [
         {
           "name": "text",
-          "source": "/document/content",
+          "source": "/document/merged_content",
           "inputs": []
         }
       ],
@@ -32,7 +85,6 @@
       "name": "Text.Embedding",
       "context": "/document/pages/*",
       "resourceUri": "https://cognisense-model.openai.azure.com",
-      "apiKey": "<redacted>",
       "deploymentId": "text-embedding-3-small",
       "dimensions": 1536,
       "modelName": "text-embedding-3-small",
@@ -71,6 +123,11 @@
       ]
     }
   ],
+  "cognitiveServices": {
+    "@odata.type": "#Microsoft.Azure.Search.CognitiveServicesByKey",
+    "description": "Multi-service Cognitive Services resource (same region as the search service). Required for OCR beyond 20 docs.",
+    "key": "<redacted>"
+  },
   "indexProjections": {
     "selectors": [
       {
@@ -95,7 +152,7 @@
           },
           {
             "name": "content",
-            "source": "/document/content",
+            "source": "/document/merged_content",
             "inputs": []
           },
           {
