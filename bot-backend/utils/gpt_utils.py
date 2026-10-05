@@ -209,6 +209,7 @@ def agentic_chat(user_message, history=None):
             messages=messages,
             tools=SEARCH_TOOL,
             tool_choice="auto",
+            reasoning_effort="low",
         )
     except Exception as e:
         logger.exception("agentic_chat: initial model call failed")
@@ -278,6 +279,7 @@ def agentic_chat(user_message, history=None):
     second = openai_chat_client.chat.completions.create(
         model=AZURE_CHAT_MODEL,
         messages=messages,
+        reasoning_effort="low",
     )
     result["answer"] = second.choices[0].message.content or ""
     return result
@@ -308,6 +310,7 @@ def detect_topic(user_message: str) -> str:
     response = openai_chat_client.chat.completions.create(
         model=AZURE_CHAT_MODEL,
         max_completion_tokens=256,
+        reasoning_effort="minimal",
         messages=[
             {"role": "system", "content": topic_system_prompt},
             {"role": "user", "content": user_message}

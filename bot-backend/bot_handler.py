@@ -75,11 +75,15 @@ def chat():
     # Short-term memory: last 6 messages so the agent can resolve follow-up questions.
     history = get_recent_messages(user_id, limit=6)
 
-    topic = detect_topic(user_query)
-    store_message(user_id, "user", user_query, topic)
-
     try:
         chat_result = agentic_chat(user_query, history=history)
+
+        # Only compute a topic when the agent actually treated this as a
+        # knowledge question. For greetings/smalltalk we skip the extra model
+        # call entirely to keep responses fast.
+        topic = detect_topic(user_query) if chat_result["used_search"] else "general"
+
+        store_message(user_id, "user", user_query, topic)
 
         answer = chat_result["answer"]
         if chat_result["used_search"] and chat_result["sources"]:
