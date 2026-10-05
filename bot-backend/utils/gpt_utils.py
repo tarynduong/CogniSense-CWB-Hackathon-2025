@@ -80,14 +80,18 @@ chat_system_prompt = """
 def generate_answer(query, docs):
     messages = [
         {"role": "system", "content": chat_system_prompt},
-        {"role": "user", "content": query},
-        {"role": "function", "name": "search_docs", "content": f"Retrieved documents:\n{docs}"}
+        {
+            "role": "user",
+            "content": (
+                f"Question:\n{query}\n\n"
+                f"[RETRIEVED DOCUMENTS]\n{docs}"
+            ),
+        },
     ]
 
     response = openai_chat_client.chat.completions.create(
         model=AZURE_CHAT_MODEL,
-        messages=messages,
-        temperature=0.2
+        messages=messages
     )
 
     return response.choices[0].message.content
@@ -117,14 +121,14 @@ def detect_topic(user_message: str) -> str:
 
     response = openai_chat_client.chat.completions.create(
         model=AZURE_CHAT_MODEL,
-        temperature=0,
-        max_completion_tokens=10,
+        max_completion_tokens=256,
         messages=[
             {"role": "system", "content": topic_system_prompt},
             {"role": "user", "content": user_message}
         ]
     )
-    topic = response.choices[0].message.content.strip().lower()
+    content = response.choices[0].message.content
+    topic = content.strip().lower() if content else "general"
     topic_cache[user_message] = topic
     return topic
 
@@ -162,7 +166,6 @@ def generate_quiz_from_history(history, topic, user_id):
     response = openai_chat_client.beta.chat.completions.parse(
         model=AZURE_CHAT_MODEL,
         messages=messages,
-        temperature=0.5,
         response_format=Quizzes
     )
     message = response.choices[0].message
@@ -203,7 +206,6 @@ def generate_flashcard_from_history(history, topic, user_id):
     response = openai_chat_client.beta.chat.completions.parse(
         model=AZURE_CHAT_MODEL,
         messages=messages,
-        temperature=0.5,
         response_format=Flashcards
     )
 

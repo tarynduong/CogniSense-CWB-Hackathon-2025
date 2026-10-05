@@ -5,13 +5,18 @@ from nltk.stem import WordNetLemmatizer
 import requests
 import string
 import jwt
+import hashlib
 from datetime import datetime as dt
 import os
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-SECRET_KEY = os.getenv("SECRET_KEY")
+_RAW_SECRET_KEY = os.getenv("SECRET_KEY") or ""
+# Derive a stable 32-byte key so HS256 always meets RFC 7518's minimum key
+# length. This avoids PyJWT's InsecureKeyLengthWarning / InvalidKeyError when
+# the configured SECRET_KEY is shorter than 32 bytes, without changing config.
+SECRET_KEY = hashlib.sha256(_RAW_SECRET_KEY.encode("utf-8")).digest()
 
 nltk.data.path.append("./utils/nltk_data")
 
@@ -55,12 +60,22 @@ def encode_token(id):
 
 
 def decode_token(token):
-    payload = jwt.decode(token, SECRET_KEY, algorithms = ["HS256"])
-    exp = payload["exp"]
-    if exp < dt.now().timestamp():
+    if not token:
+        return "Unauthorized: missing token", 401
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        return "Unauthorized: token expired", 401
+    except jwt.InvalidKeyError:
+        # Server-side key misconfiguration, not a bad user token.
+        return "Server authentication error", 500
+    except jwt.InvalidTokenError:
+        return "Unauthorized: invalid token", 401
+
+    exp = payload.get("exp")
+    if exp is None or exp < dt.now().timestamp():
         return "Unauthorized", 401
-    else:
-        return payload, 200
+    return payload, 200
 
 
 def preprocess_user_query(query):
