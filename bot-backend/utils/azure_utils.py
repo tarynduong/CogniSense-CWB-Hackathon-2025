@@ -132,6 +132,30 @@ def get_user_chat_history(user_id, topic):
     return [(item['Role'], item['Content']) for item in items]
 
 
+def get_recent_messages(user_id, limit=6):
+    """
+    Returns the most recent chat messages for a user (any topic), oldest-first,
+    as a list of (role, content) tuples. Used to give the chat agent short-term
+    conversational memory so it can resolve follow-up questions.
+    """
+    query = (
+        "SELECT c.Role, c.Content, c.Timestamp "
+        "FROM Messages c WHERE c.UserId = @user_id "
+        "ORDER BY c.Timestamp DESC"
+    )
+    params = [{"name": "@user_id", "value": user_id}]
+    items = list(chat_container.query_items(
+        query=query,
+        parameters=params,
+        enable_cross_partition_query=True,
+        max_item_count=limit,
+    ))
+    # Keep only the most recent `limit`, then reverse to chronological order.
+    items = items[:limit]
+    items.reverse()
+    return [(item["Role"], item["Content"]) for item in items]
+
+
 def get_past_topic(user_id):
     query = f"SELECT c.Topic FROM Messages c WHERE c.UserId = @user_id ORDER BY c.Timestamp"
     params = [{"name": "@user_id", "value": user_id}]

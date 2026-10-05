@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
-from utils.gpt_utils import generate_answer, detect_topic, generate_quiz_from_history, generate_flashcard_from_history
-from utils.azure_utils import add_user, check_user, upload_to_blob, search_content, store_message, get_user_chat_history
+from utils.gpt_utils import generate_answer, detect_topic, generate_quiz_from_history, generate_flashcard_from_history, agentic_chat
+from utils.azure_utils import add_user, check_user, upload_to_blob, search_content, store_message, get_user_chat_history, get_recent_messages
 from utils.knowledge_utils import decode_token, extract_text_from_url, preprocess_user_query, encode_token
 
 
@@ -71,34 +71,33 @@ def chat():
 
     user_id = result['user_id']
     user_query = data.get("query")
+
+    # Short-term memory: last 6 messages so the agent can resolve follow-up questions.
+    history = get_recent_messages(user_id, limit=6)
+
     topic = detect_topic(user_query)
     store_message(user_id, "user", user_query, topic)
-    expanded_query = preprocess_user_query(user_query)
+
     try:
-        file_type, search_results = search_content(expanded_query)
-        source = []
-        match_chunk = []
-        for doc in search_results:
-            if "metadata_storage_name" in doc and doc["metadata_storage_name"] not in source:
-                source.append(doc["metadata_storage_name"])
-            if "chunk" in doc and doc["chunk"] not in match_chunk:
-                match_chunk.append(doc["chunk"])
+        chat_result = agentic_chat(user_query, history=history)
 
-        fallback_message = (
-            f"I couldn't find any relevant results in **{file_type.upper()}** files, "
-            f"but here are some matches from other file types.\n\n"
-        ) if file_type is not None else None
+        answer = chat_result["answer"]
+        if chat_result["used_search"] and chat_result["sources"]:
+            source_str = ", ".join(chat_result["sources"])
+            answer = f"Source: {source_str}\n\n{answer}"
 
-        docs_text = "\n\n".join(match_chunk)
-        source_str = ", ".join(source)
-        answer = f"Source: {source_str}\n\n" + generate_answer(expanded_query, docs_text)
-        if fallback_message:
-            answer = fallback_message + answer
         store_message(user_id, "assistant", answer, topic)
 
-        return jsonify({"topic": topic, "answer": answer})
+        return jsonify({
+            "topic": topic,
+            "answer": answer,
+            # Tracking info so you can see what the agent did:
+            "used_search": chat_result["used_search"],
+            "search_query": chat_result["search_query"],
+            "query_source": chat_result["query_source"],  # "agent" | "fallback" | "none"
+        })
     except Exception as e:
-        return jsonify({"error": "Search failed", "details": str(e)}), 500
+        return jsonify({"error": "Chat failed", "details": str(e)}), 500
 
 
 @bot_bp.route("/quiz", methods=["POST"])
@@ -113,7 +112,7 @@ def quiz():
     user_id = result['user_id']
     topic = data.get("topic")
 
-    history = get_user_chat_history(user_id, topic if topic else "GenAI") # Use GenAI as default topic
+    history = get_user_chat_history(user_id, topic)
     message, quiz = generate_quiz_from_history(history, topic, user_id)
 
     return jsonify({"message": message, "quiz": quiz})
@@ -131,7 +130,7 @@ def flashcard():
     user_id = result['user_id']
     topic = data.get("topic")
 
-    history = get_user_chat_history(user_id, topic if topic else "GenAI") # Use GenAI as default topic
+    history = get_user_chat_history(user_id, topic)
     message, flashcard = generate_flashcard_from_history(history, topic, user_id)
 
     return jsonify({"flashcard": flashcard, "message": message})

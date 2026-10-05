@@ -1,11 +1,17 @@
 from nltk.classify.textcat import re
 from openai import AzureOpenAI
 import os
+import json
+import logging
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from .azure_utils import get_past_topic
+from .azure_utils import get_past_topic, search_content
+from .knowledge_utils import preprocess_user_query
 
 load_dotenv()
+
+logger = logging.getLogger("cognisense.agent")
+logging.basicConfig(level=logging.INFO)
 
 AZURE_EMBEDDING_OPENAI_API_KEY = os.getenv("AZURE_EMBEDDING_OPENAI_API_KEY")
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -95,6 +101,186 @@ def generate_answer(query, docs):
     )
 
     return response.choices[0].message.content
+
+
+# ---------------------------------------------------------------------------
+# Agentic chat
+# ---------------------------------------------------------------------------
+
+SEARCH_TOOL = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_knowledge_base",
+            "description": (
+                "Search the user's uploaded documents, notes, and web links for "
+                "information needed to answer a knowledge question. Call this "
+                "whenever the user asks about the content of their materials. Do "
+                "NOT call it for greetings, thanks, or general small talk."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": (
+                            "A clean, concept-focused search query that captures "
+                            "what to look for. Strip instruction words like "
+                            "'extract', 'summarize', or 'prove this idea' and keep "
+                            "the underlying topic/keywords. Resolve references to "
+                            "earlier turns (e.g. 'that', 'it') into explicit terms."
+                        ),
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+    }
+]
+
+agent_behavior = """
+    [AGENT BEHAVIOR]
+    - You have a tool `search_knowledge_base`. Decide for yourself whether the user's message needs it.
+    - For greetings or small talk, answer directly and briefly WITHOUT calling the tool.
+    - For questions about the user's materials, call the tool with a clean, concept-focused query, then answer using the retrieved documents.
+    - Use the prior conversation turns to resolve follow-up questions.
+"""
+
+agent_system_prompt = chat_system_prompt + agent_behavior
+
+
+def _history_to_messages(history):
+    """Convert [(role, content), ...] into chat message dicts the model accepts."""
+    msgs = []
+    for role, content in history or []:
+        role = "assistant" if role == "assistant" else "user"
+        msgs.append({"role": role, "content": content})
+    return msgs
+
+
+def _run_search(query):
+    """Run the index search and format sources + chunks. Returns (sources, docs_text)."""
+    file_type, search_results = search_content(query)
+    sources = []
+    chunks = []
+    for doc in search_results:
+        name = doc.get("metadata_storage_name")
+        if name and name not in sources:
+            sources.append(name)
+        chunk = doc.get("chunk")
+        if chunk and chunk not in chunks:
+            chunks.append(chunk)
+    return sources, "\n\n".join(chunks)
+
+
+def agentic_chat(user_message, history=None):
+    """
+    Agentic chat turn.
+
+    Returns a dict:
+      {
+        "answer": str,
+        "used_search": bool,        # did the agent decide to search?
+        "search_query": str | None, # the query actually used
+        "query_source": "agent" | "fallback" | "none",
+        "sources": [filenames],
+      }
+
+    The model decides whether to call the search tool. If it does, we run the
+    search and let it answer from the results. If the tool call is malformed we
+    fall back to preprocess_user_query() + raw message so retrieval still works.
+    """
+    result = {
+        "answer": "",
+        "used_search": False,
+        "search_query": None,
+        "query_source": "none",
+        "sources": [],
+    }
+
+    messages = [{"role": "system", "content": agent_system_prompt}]
+    messages.extend(_history_to_messages(history))
+    messages.append({"role": "user", "content": user_message})
+
+    # Turn 1: let the agent decide whether to search
+    try:
+        first = openai_chat_client.chat.completions.create(
+            model=AZURE_CHAT_MODEL,
+            messages=messages,
+            tools=SEARCH_TOOL,
+            tool_choice="auto",
+        )
+    except Exception as e:
+        logger.exception("agentic_chat: initial model call failed")
+        raise
+
+    choice = first.choices[0].message
+    tool_calls = getattr(choice, "tool_calls", None)
+
+    # No tool call => smalltalk / direct answer
+    if not tool_calls:
+        logger.info("agentic_chat: NO SEARCH (direct answer / smalltalk)")
+        result["answer"] = choice.content or ""
+        return result
+
+    # Agent chose to search
+    tool_call = tool_calls[0]
+    search_query = None
+    query_source = "agent"
+    try:
+        args = json.loads(tool_call.function.arguments or "{}")
+        search_query = (args.get("query") or "").strip()
+    except (ValueError, TypeError):
+        search_query = None
+
+    if not search_query:
+        # Agent asked to search but gave an unusable query -> fallback.
+        search_query = preprocess_user_query(user_message)
+        query_source = "fallback"
+
+    logger.info(
+        "agentic_chat: SEARCH query_source=%s query=%r",
+        query_source, search_query,
+    )
+
+    try:
+        sources, docs_text = _run_search(search_query)
+    except Exception:
+        logger.exception("agentic_chat: search_content failed; retrying with fallback query")
+        search_query = preprocess_user_query(user_message)
+        query_source = "fallback"
+        logger.info("agentic_chat: SEARCH (retry) query_source=%s query=%r", query_source, search_query)
+        sources, docs_text = _run_search(search_query)
+
+    result["used_search"] = True
+    result["search_query"] = search_query
+    result["query_source"] = query_source
+    result["sources"] = sources
+
+    # Turn 2: give the agent the tool result and let it answer ---
+    messages.append({
+        "role": "assistant",
+        "tool_calls": [{
+            "id": tool_call.id,
+            "type": "function",
+            "function": {
+                "name": tool_call.function.name,
+                "arguments": tool_call.function.arguments,
+            },
+        }],
+    })
+    messages.append({
+        "role": "tool",
+        "tool_call_id": tool_call.id,
+        "content": f"[RETRIEVED DOCUMENTS]\n{docs_text}" if docs_text else "No relevant documents were found.",
+    })
+
+    second = openai_chat_client.chat.completions.create(
+        model=AZURE_CHAT_MODEL,
+        messages=messages,
+    )
+    result["answer"] = second.choices[0].message.content or ""
+    return result
 
 
 topic_system_prompt = """
