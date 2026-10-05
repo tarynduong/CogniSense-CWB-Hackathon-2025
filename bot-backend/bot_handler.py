@@ -1,4 +1,7 @@
-from flask import Blueprint, jsonify, request
+import json
+import queue
+import threading
+from flask import Blueprint, jsonify, request, Response, stream_with_context
 from utils.gpt_utils import generate_answer, detect_topic, generate_quiz_from_history, generate_flashcard_from_history, agentic_chat
 from utils.azure_utils import add_user, check_user, upload_to_blob, search_content, store_message, get_user_chat_history, get_recent_messages
 from utils.knowledge_utils import decode_token, extract_text_from_url, preprocess_user_query, encode_token
@@ -102,6 +105,80 @@ def chat():
         })
     except Exception as e:
         return jsonify({"error": "Chat failed", "details": str(e)}), 500
+
+
+@bot_bp.route("/chat/stream", methods=["POST"])
+def chat_stream():
+    """
+    Streaming version of /chat. Emits newline-delimited JSON (NDJSON) events so
+    the UI can show real pipeline stages:
+
+      {"type": "stage", "stage": "understanding"}
+      {"type": "stage", "stage": "searching", "query": "..."}
+      {"type": "stage", "stage": "writing"}
+      {"type": "done", "answer": "...", "topic": "...", "used_search": true,
+       "search_query": "...", "query_source": "agent"}
+      {"type": "error", "details": "..."}
+    """
+    data = request.get_json()
+    header = request.headers.get("Authorization")
+    token = header[7:] if header else None  # remove Bearer
+    result, status_code = decode_token(token)
+    if status_code != 200:
+        return jsonify({"message": result}), status_code
+
+    user_id = result["user_id"]
+    user_query = data.get("query")
+    history = get_recent_messages(user_id, limit=6)
+
+    events = queue.Queue()
+
+    def on_stage(stage, detail):
+        payload = {"type": "stage", "stage": stage}
+        if detail:
+            payload.update(detail)
+        events.put(payload)
+
+    def worker():
+        try:
+            chat_result = agentic_chat(user_query, history=history, on_stage=on_stage)
+
+            topic = detect_topic(user_query) if chat_result["used_search"] else "general"
+            store_message(user_id, "user", user_query, topic)
+
+            answer = chat_result["answer"]
+            if chat_result["used_search"] and chat_result["sources"]:
+                source_str = ", ".join(chat_result["sources"])
+                answer = f"Source: {source_str}\n\n{answer}"
+
+            store_message(user_id, "assistant", answer, topic)
+
+            events.put({
+                "type": "done",
+                "answer": answer,
+                "topic": topic,
+                "used_search": chat_result["used_search"],
+                "search_query": chat_result["search_query"],
+                "query_source": chat_result["query_source"],
+            })
+        except Exception as e:
+            events.put({"type": "error", "details": str(e)})
+        finally:
+            events.put(None)  # sentinel: stream complete
+
+    def generate():
+        threading.Thread(target=worker, daemon=True).start()
+        while True:
+            event = events.get()
+            if event is None:
+                break
+            yield json.dumps(event) + "\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @bot_bp.route("/quiz", methods=["POST"])

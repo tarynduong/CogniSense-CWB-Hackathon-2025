@@ -6,5 +6,6 @@ export const REGISTER_ENDPOINT = `${API_ENDPOINT}/register`;
 export const UPLOAD_FILE_ENDPOINT = `${API_ENDPOINT}/ingest_file`;
 export const UPLOAD_URL_ENDPOINT = `${API_ENDPOINT}/ingest_url`;
 export const CHAT_ENDPOINT = `${API_ENDPOINT}/chat`;
+export const CHAT_STREAM_ENDPOINT = `${API_ENDPOINT}/chat/stream`;
 export const QUIZ_ENDPOINT = `${API_ENDPOINT}/quiz`;
 export const FLASHCARD_ENDPOINT = `${API_ENDPOINT}/flashcard`;

@@ -1,4 +1,4 @@
-import { chatWithBot } from "@/api/chat";
+import { chatWithBotStream, type ChatStage } from "@/api/chat";
 import { ArrowUpIcon } from "@/components/icons";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
@@ -56,21 +56,62 @@ function Messages({ messages }: { messages: Message[] }) {
   );
 }
 
+const STAGE_LABELS: Record<ChatStage, string> = {
+  understanding: "Understanding your question…",
+  searching: "Searching your documents…",
+  writing: "Writing the answer…",
+};
+
+function StageIndicator({ stage }: { stage: ChatStage }) {
+  const label = STAGE_LABELS[stage];
+  return (
+    <div className="w-full mx-auto max-w-3xl px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 5 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-2 text-sm text-zinc-500"
+        data-testid="stage-indicator"
+      >
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <motion.span
+          key={label}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          {label}
+        </motion.span>
+      </motion.div>
+    </div>
+  );
+}
+
 export function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isFetching, setFetching] = useState<boolean>(false);
+  const [stage, setStage] = useState<ChatStage | null>(null);
   const [currentMessage, setCurrentMessage] = useState<string>("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const onSubmitMessage = async (message: Message) => {
     if (message.text.trim() === "") return;
     setFetching(true);
+    setStage(null);
     setMessages((prev) => [...prev, message]);
     setCurrentMessage("");
 
+    // Only surface the stage bubble for search/knowledge questions. The
+    // "understanding" stage fires for every message (including greetings), so
+    // we start showing stages only once the agent actually begins searching.
+    let searchFlow = false;
+
     try {
-      // API Call here
-      const { answer, error } = await chatWithBot(message.text);
+      const { answer, error } = await chatWithBotStream(
+        message.text,
+        (nextStage) => {
+          if (nextStage === "searching") searchFlow = true;
+          if (searchFlow) setStage(nextStage);
+        }
+      );
       const text =
         answer ||
         (error
@@ -94,12 +135,13 @@ export function Chat() {
         },
       ]);
     } finally {
+      setStage(null);
       setFetching(false);
     }
   };
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, stage]);
 
   return (
     <div className="flex flex-col min-w-0 h-dvh">
@@ -130,6 +172,7 @@ export function Chat() {
           </div>
         )}
         {messages.length > 0 && <Messages messages={messages} />}
+        {isFetching && stage && <StageIndicator stage={stage} />}
         <div ref={bottomRef} />
       </div>
 

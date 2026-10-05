@@ -173,7 +173,7 @@ def _run_search(query):
     return sources, "\n\n".join(chunks)
 
 
-def agentic_chat(user_message, history=None):
+def agentic_chat(user_message, history=None, on_stage=None):
     """
     Agentic chat turn.
 
@@ -186,10 +186,21 @@ def agentic_chat(user_message, history=None):
         "sources": [filenames],
       }
 
+    `on_stage(stage: str, detail: dict)` is an optional callback invoked as the
+    pipeline progresses, so a streaming caller can surface real-time status to
+    the UI. Stages: "understanding", "searching", "writing".
+
     The model decides whether to call the search tool. If it does, we run the
     search and let it answer from the results. If the tool call is malformed we
     fall back to preprocess_user_query() + raw message so retrieval still works.
     """
+    def _stage(name, detail=None):
+        if on_stage:
+            try:
+                on_stage(name, detail or {})
+            except Exception:
+                logger.exception("agentic_chat: on_stage callback failed")
+
     result = {
         "answer": "",
         "used_search": False,
@@ -201,6 +212,9 @@ def agentic_chat(user_message, history=None):
     messages = [{"role": "system", "content": agent_system_prompt}]
     messages.extend(_history_to_messages(history))
     messages.append({"role": "user", "content": user_message})
+
+    # Stage 1: understanding the question / deciding whether to search
+    _stage("understanding")
 
     # Turn 1: let the agent decide whether to search
     try:
@@ -221,6 +235,7 @@ def agentic_chat(user_message, history=None):
     # No tool call => smalltalk / direct answer
     if not tool_calls:
         logger.info("agentic_chat: NO SEARCH (direct answer / smalltalk)")
+        _stage("writing")
         result["answer"] = choice.content or ""
         return result
 
@@ -243,6 +258,9 @@ def agentic_chat(user_message, history=None):
         "agentic_chat: SEARCH query_source=%s query=%r",
         query_source, search_query,
     )
+
+    # Stage 2: searching the knowledge base
+    _stage("searching", {"query": search_query})
 
     try:
         sources, docs_text = _run_search(search_query)
@@ -275,6 +293,9 @@ def agentic_chat(user_message, history=None):
         "tool_call_id": tool_call.id,
         "content": f"[RETRIEVED DOCUMENTS]\n{docs_text}" if docs_text else "No relevant documents were found.",
     })
+
+    # Stage 3: writing the grounded answer
+    _stage("writing")
 
     second = openai_chat_client.chat.completions.create(
         model=AZURE_CHAT_MODEL,
