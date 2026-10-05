@@ -56,27 +56,46 @@ export function AppSidebar() {
   const [open, setOpen] = useState(false);
   const [isUploading, setUploading] = useState(false);
   const [fileType, setFileType] = useState("notes");
+  const [notice, setNotice] = useState<
+    { type: "success" | "error"; text: string } | null
+  >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const blogUrlRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async () => {
     const file = fileInputRef.current?.files?.[0];
-    const blogUrl = blogUrlRef.current?.value;
+    const blogUrl = blogUrlRef.current?.value?.trim();
 
     if (!file && !blogUrl) {
       return;
     }
 
     setUploading(true);
+    setNotice(null);
 
     try {
-      await Promise.allSettled([
-        file && uploadFile(file, fileType),
-        blogUrl && uploadBlog(blogUrl),
-      ]);
+      if (file) {
+        await uploadFile(file, fileType);
+      }
+
+      if (blogUrl) {
+        const result = await uploadBlog(blogUrl);
+        if (!result.ok) {
+          // Show the specific reason (e.g. link blocked for scraping) and keep
+          // the dialog open so the user can try another link.
+          setNotice({ type: "error", text: result.error ?? "Failed to import the link." });
+          return;
+        }
+      }
+
+      setNotice({ type: "success", text: "Imported successfully." });
       setOpen(false);
     } catch (err) {
-      console.error(err);
+      setNotice({
+        type: "error",
+        text:
+          err instanceof Error ? err.message : "Something went wrong while importing.",
+      });
     } finally {
       setUploading(false);
     }
@@ -133,7 +152,13 @@ export function AppSidebar() {
         </SidebarContent>
         <SidebarFooter></SidebarFooter>
       </Sidebar>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setNotice(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Upload your document</DialogTitle>
@@ -170,6 +195,17 @@ export function AppSidebar() {
               />
             </div>
           </div>
+          {notice && (
+            <p
+              className={
+                notice.type === "error"
+                  ? "text-sm text-red-500"
+                  : "text-sm text-green-600"
+              }
+            >
+              {notice.text}
+            </p>
+          )}
           <DialogFooter>
             <Button type="button" onClick={handleSubmit} disabled={isUploading}>
               {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

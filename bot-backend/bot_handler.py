@@ -4,7 +4,7 @@ import threading
 from flask import Blueprint, jsonify, request, Response, stream_with_context
 from utils.gpt_utils import generate_answer, detect_topic, generate_quiz_from_history, generate_flashcard_from_history, agentic_chat
 from utils.azure_utils import add_user, check_user, upload_to_blob, search_content, store_message, get_user_chat_history, get_recent_messages
-from utils.knowledge_utils import decode_token, extract_text_from_url, preprocess_user_query, encode_token
+from utils.knowledge_utils import decode_token, extract_text_from_url, preprocess_user_query, encode_token, UrlFetchError
 
 
 bot_bp = Blueprint("bot_bp", __name__)
@@ -12,14 +12,52 @@ bot_bp = Blueprint("bot_bp", __name__)
 
 @bot_bp.route("/ingest_url", methods=["POST"])
 def ingest_url():
-    if "url" in request.form:
-        url = request.form["url"]
-        text = extract_text_from_url(url)
-        filename = url.replace("https://", "").split("/")[-2] + ".txt" if url.replace("https://", "").split("/")[-1] == "" else url.replace("https://", "").split("/")[-1] + ".txt"
-    else:
+    if "url" not in request.form or not request.form["url"].strip():
         return jsonify({"error": "No URL provided"}), 400
 
-    message = upload_to_blob("blogs", filename, text)
+    url = request.form["url"].strip()
+
+    # Map each failure reason to a user-facing notification and HTTP status.
+    reason_messages = {
+        "blocked": ("This link is blocked for scraping, so its content can't be imported. Try a different source.", 422),
+        "timeout": ("The site took too long to respond. Please try again or use another link.", 504),
+        "unreachable": ("Couldn't reach that link. Check the URL and try again.", 400),
+        "http_error": ("The site returned an error and couldn't be read.", 422),
+        "not_webpage": ("That link isn't a readable web page. For PDFs or documents, use file upload instead.", 415),
+        "no_content": ("No readable text was found — the page may be JavaScript-rendered. Try a different link.", 422),
+    }
+
+    try:
+        text = extract_text_from_url(url)
+    except UrlFetchError as e:
+        message, http_status = reason_messages.get(
+            e.reason, ("Could not fetch or read that URL.", 400)
+        )
+        return jsonify({
+            "error": message,
+            "reason": e.reason,
+            "details": e.message,
+        }), http_status
+    except Exception as e:
+        return jsonify({
+            "error": "Could not fetch or read that URL.",
+            "reason": "unknown",
+            "details": str(e),
+        }), 400
+
+    # Build a .txt filename from the last meaningful path segment.
+    stripped = url.replace("https://", "").replace("http://", "").rstrip("/")
+    last_segment = stripped.split("/")[-1] if "/" in stripped else stripped
+    filename = (last_segment or "webpage") + ".txt"
+
+    try:
+        message = upload_to_blob("blogs", filename, text)
+    except Exception as e:
+        return jsonify({
+            "error": "We read the link but couldn't save it. Please try again in a moment.",
+            "reason": "storage_error",
+            "details": str(e),
+        }), 500
 
     return jsonify({"message": message, "filename": filename}), 200
 

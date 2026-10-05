@@ -21,31 +21,110 @@ SECRET_KEY = hashlib.sha256(_RAW_SECRET_KEY.encode("utf-8")).digest()
 nltk.data.path.append("./utils/nltk_data")
 
 
-def extract_text_from_url(url: str):
-    """
-    Extracts the main content from a URL received from user, removing HTML tags, scripts.
+_BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    )
+}
 
-    Args:
-        url (str): The URL of the webpage to extract text from.
 
-    Returns:
-        str: The extracted text content.
+class UrlFetchError(Exception):
     """
-    # send an HTTP GET request to the URL
-    response = requests.get(url)
-    response.raise_for_status()
-    # parse the HTML content
-    soup = BeautifulSoup(response.content, 'html.parser')
-    for script_or_style in soup.find_all(['script', 'style']):
+    Raised when a URL cannot be ingested. `reason` is a machine-readable code
+    the API layer maps to a user-facing notification:
+      - "blocked"      : site refused automated access (403/429/Cloudflare)
+      - "timeout"      : site too slow
+      - "unreachable"  : DNS / connection failure
+      - "http_error"   : other HTTP error status
+      - "not_webpage"  : link is not HTML (e.g. a PDF or binary)
+      - "no_content"   : page loaded but no readable text (often JS-rendered)
+    """
+
+    def __init__(self, reason: str, message: str):
+        super().__init__(message)
+        self.reason = reason
+        self.message = message
+
+
+def _beautifulsoup_extract(html: bytes) -> str:
+    """Fallback extractor: strip scripts/styles and collapse whitespace."""
+    soup = BeautifulSoup(html, "html.parser")
+    for script_or_style in soup.find_all(["script", "style", "noscript"]):
         script_or_style.decompose()
-    # get the main text
     text = soup.get_text()
-    # break into lines and remove leading and trailing space on each
     lines = (line.strip() for line in text.splitlines())
-    # break multi-headlines into a line each
     chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-    # drop blank lines
-    text = '\n'.join(chunk for chunk in chunks if chunk)
+    return "\n".join(chunk for chunk in chunks if chunk)
+
+
+def extract_text_from_url(url: str) -> str:
+    """
+    Extract the main text content from a web page.
+
+    Strategy (graceful fallback):
+      1. Fetch the HTML with a browser-like User-Agent (avoids many 403s).
+      2. Try trafilatura, which isolates the main article body and drops
+         navigation/boilerplate -- works on far more sites than raw parsing.
+      3. If trafilatura returns nothing, fall back to BeautifulSoup.
+
+    Returns the extracted text (may be empty if the page is JavaScript-rendered
+    or otherwise unreadable; the caller should handle the empty case).
+    """
+    try:
+        response = requests.get(url, headers=_BROWSER_HEADERS, timeout=20)
+    except requests.exceptions.Timeout:
+        raise UrlFetchError("timeout", "The site took too long to respond.")
+    except requests.exceptions.RequestException as e:
+        raise UrlFetchError("unreachable", f"Could not connect to the site. ({e})")
+
+    status = response.status_code
+    # 403/401/429 and Cloudflare-style 503 almost always mean anti-bot blocking.
+    if status in (401, 403, 429, 451) or status == 503:
+        raise UrlFetchError(
+            "blocked",
+            f"The site blocked automated access (HTTP {status}).",
+        )
+    if status >= 400:
+        raise UrlFetchError(
+            "http_error",
+            f"The site returned an error (HTTP {status}).",
+        )
+
+    content_type = response.headers.get("Content-Type", "").lower()
+    if "html" not in content_type and "text" not in content_type:
+        # Not an HTML/text page (e.g. a direct PDF link); not scrapeable here.
+        raise UrlFetchError(
+            "not_webpage",
+            f"That link isn't a readable web page (content type: {content_type or 'unknown'}).",
+        )
+
+    # 1) Preferred: trafilatura main-content extraction.
+    text = ""
+    try:
+        import trafilatura
+        extracted = trafilatura.extract(
+            response.text,
+            include_comments=False,
+            include_tables=True,
+            favor_recall=True,
+        )
+        if extracted:
+            text = extracted.strip()
+    except Exception:
+        # trafilatura unavailable or failed -> fall through to BeautifulSoup.
+        text = ""
+
+    # 2) Fallback: BeautifulSoup.
+    if not text:
+        text = _beautifulsoup_extract(response.content)
+
+    if not text or not text.strip():
+        raise UrlFetchError(
+            "no_content",
+            "The page loaded but no readable text was found "
+            "(it may be JavaScript-rendered).",
+        )
 
     return text
 
