@@ -1,6 +1,6 @@
 {
   "@odata.context": "https://cognisense-vector-search.search.windows.net/$metadata#datasources/$entity",
-  "@odata.etag": "\"0x8DD9A39650B7F14\"",
+  "@odata.etag": "\"0x8DF22F1E4C527F4\"",
   "name": "cognisense-kb",
   "description": null,
   "type": "azureblob",
