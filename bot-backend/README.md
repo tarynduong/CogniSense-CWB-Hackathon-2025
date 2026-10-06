@@ -28,6 +28,7 @@ CogniSense is an intelligent, conversational AI assistant that helps users manag
 bot-backend/
 ├── utils/
 │   ├── azure_utils.py     # Azure services integration
+│   ├── data_utils.py      # Data structures and utilities
 │   ├── gpt_utils.py       # OpenAI API integration
 │   ├── knowledge_utils.py # NLP and token handling
 │   └── nltk_data/         # NLTK data directory
@@ -37,18 +38,27 @@ bot-backend/
 └── web_app.py             # Flask application setup
 ```
 
+## Sample data
+Data is stored in Azure Storage Account and categorized into 3 types:
+
+- Documents: text files that are not notes (PDF, TXT)
+- Notes: meeting discussion, exam notes, personal notes
+- Blogs: file text TXT extracted from web link
+
 ## Setup and Installation
 
 ### Prerequisites
 
 - Python 3.13+
 - Azure account with the following services:
-  - Azure OpenAI
-  - Azure Cosmos DB
-  - Azure Blob Storage
-  - Azure Cognitive Search
+  - Azure AI services multi-service account (for OCR skill)
+  - Azure OpenAI (for embedding and LLM model)
+  - Azure Cosmos DB (for storing user login and chat history)
+  - Azure Blob Storage (for storing sample data)
+  - Azure AI Search (indexing service)
+  - Azure App Service (2 apps, one for frontend and the other for backend)
 
-### Installation Steps
+### Installation Steps for Backend
 
 1. Clone the repository:
    ```
@@ -72,10 +82,17 @@ bot-backend/
    python nltk_download.py
    ```
 
-5. Run the application:
+5. Create a `.env` file folllowith the file `.env.example`
+
+6. Run the application:
    ```
    python web_app.py
    ```
+   
+7. Start up command in Azure Web APP
+  ```
+  gunicorn --bind=0.0.0.0:8000 --timeout 600 web_app:app
+  ```
 
 ## API Endpoints
 
