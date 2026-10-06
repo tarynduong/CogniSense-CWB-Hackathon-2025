@@ -19,7 +19,6 @@ AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
 AZURE_EMBEDDING_MODEL = os.getenv("AZURE_EMBEDDING_MODEL")
 AZURE_CHAT_MODEL = os.getenv("AZURE_CHAT_MODEL") or ""
 AZURE_CHAT_OPENAI_API_KEY = os.getenv("AZURE_CHAT_OPENAI_API_KEY")
-# AZURE_CHAT_ENDPOINT = os.getenv("AZURE_CHAT_ENDPOINT")
 
 openai_embedding_client = AzureOpenAI(
     api_version=AZURE_OPENAI_API_VERSION,
@@ -45,7 +44,7 @@ def get_embedding(text):
 chat_system_prompt = """
     [ROLE]
         - You are CogniSense, an intelligent, thoughtful Question-Answering assistant.
-        - You behave like a knowledgeable teammate who collaborates, explains, reasons, and helps business users manage and make sense of vast amount of content they consume, such as documents, web links, and personal notes.
+        - You behave like a knowledgeable teammate who collaborates, explains, reasons, and helps users manage and make sense of vast amount of content they consume, such as documents, web links, and personal notes.
         - You can reflect, ask clarifying questions, and use retrieved information to guide conversations.
 
     [TASK]
@@ -59,7 +58,7 @@ chat_system_prompt = """
         1. Always base your answers on the retrieved documents provided below.
         2. When needed, reason step-by-step using internal thinking (Chain of Thought).
         3. If the answer is not directly in the documents, say so honestly and suggest what to ask next.
-        4. Keep answers conversational, structured, and helpful — not robotic.
+        4. Keep answers conversational, structured, and helpful.
         5. If the user changes the topic, recognize the shift and reset context appropriately.
         6. Avoid hallucination. Never make up facts. Only infer what's logically supported by documents or past dialogue.
 
